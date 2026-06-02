@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App Luyện Phát Âm Tiếng Trung</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+        }
+        h1 {
+            color: #4a4a4a;
+            margin-bottom: 20px;
+        }
+        .word-box {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 2px solid #e9ecef;
+        }
+        .chinese-text {
+            font-size: 48px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 0;
+        }
+        .pinyin {
+            font-size: 20px;
+            color: #7f8c8d;
+            margin: 5px 0 0 0;
+        }
+        .meaning {
+            font-size: 16px;
+            color: #95a5a6;
+            font-style: italic;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        .btn-listen { background-color: #3498db; color: white; }
+        .btn-listen:hover { background-color: #2980b9; }
+        .btn-speak { background-color: #2ecc71; color: white; }
+        .btn-speak:hover { background-color: #27ae60; }
+        .btn-next { background-color: #95a5a6; color: white; }
+        .btn-next:hover { background-color: #7f8c8d; }
+        
+        .btn-speak.recording {
+            background-color: #e74c3c;
+            animation: pulse 1.5s infinite;
+        }
+
+        #result {
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .fail { background-color: #f8d7da; color: #721c24; }
+        
+        .user-voice {
+            font-size: 16px;
+            color: #555;
+            margin-top: 10px;
+            font-style: dotted;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Luyện Nói Tiếng Trung</h1>
+    
+    <div class="word-box">
+        <p class="chinese-text" id="chineseWord">你好</p>
+        <p class="pinyin" id="pinyinWord">Nǐ hǎo</p>
+        <p class="meaning" id="meaningWord">(Xin chào)</p>
+    </div>
+
+    <div class="btn-group">
+        <button class="btn-listen" onclick="listenSample()">🔈 Nghe mẫu</button>
+        <button class="btn-speak" id="speakBtn" onclick="toggleRecognition()">🎤 Nhấn để nói</button>
+        <button class="btn-next" onclick="nextWord()">Bỏ qua ➡️</button>
+    </div>
+
+    <div id="userSpeech" class="user-voice"></div>
+    <div id="result"></div>
+</div>
+
+<script>
+    // Danh sách từ vựng mẫu (Bạn có thể thêm tùy ý)
+    const vocabulary = [
+        { word: '你好', pinyin: 'Nǐ hǎo', meaning: 'Xin chào' },
+        { word: '谢谢', pinyin: 'Xièxiè', meaning: 'Cảm ơn' },
+        { word: '再见', pinyin: 'Zàijiàn', meaning: 'Tạm biệt' },
+        { word: '我爱你', pinyin: 'Wǒ ài nǐ', meaning: 'Tôi yêu bạn' },
+        { word: '中国', pinyin: 'Zhōngguó', meaning: 'Trung Quốc' },
+        { word: '苹果', pinyin: 'Píngguǒ', meaning: 'Quả táo' },
+        { word: '喝水', pinyin: 'Hē shuǐ', meaning: 'Uống nước' },
+        { word: '很高兴认识你', pinyin: 'Hěn gāoxìng rènshí nǐ', meaning: 'Rất vui được quen biết bạn' }
+    ];
+
+    let currentIndex = 0;
+    let recognition;
+    let isRecording = false;
+
+    // Khởi tạo bộ nhận diện giọng nói (Chạy tốt nhất trên Google Chrome)
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SpeechRecognition();
+        recognition.lang = 'zh-CN'; // Đặt ngôn ngữ nhận diện là tiếng Trung giản thể
+        recognition.interimResults = false; // Chỉ lấy kết quả cuối cùng
+        recognition.maxAlternatives = 1;
+
+        // Khi bắt đầu nói
+        recognition.onstart = () => {
+            isRecording = true;
+            const speakBtn = document.getElementById('speakBtn');
+            speakBtn.textContent = '🛑 Đang lắng nghe...';
+            speakBtn.classList.add('recording');
+            document.getElementById('result').className = '';
+            document.getElementById('result').textContent = '';
+            document.getElementById('userSpeech').textContent = '';
+        };
+
+        // Khi có kết quả trả về từ Google API
+        recognition.onresult = (event) => {
+            const speechToText = event.results[0][0].transcript;
+            document.getElementById('user
+  
